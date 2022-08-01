@@ -1,4 +1,4 @@
-// SPDX License-Identifier :UNNLICENSED
+// SPDX-License-Identifier: MIT
 
 pragma solidity ^0.8.0;
 
@@ -48,7 +48,7 @@ contract Test is ERC721A,Ownable {
 
     //This function allows the owner of this contract to withdraw ether
     function withdrawBalance() external onlyOwner {
-        (bool success,) = payable(owner).call{value:address(this).balance}("");
+        (bool success,) = payable(_owner).call{value:address(this).balance}("");
         if (!success) {
             revert Test_TransferFailed();
         }
