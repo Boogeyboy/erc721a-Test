@@ -1,6 +1,9 @@
+// SPDX-License-Identifier: MIT
+
 pragma solidity ^0.8.0;
 
 import "erc721a/contracts/ERC721A.sol";
+import "@openzeppelin/contracts@4.5.0/utils/cryptography/MerkleProof.sol";
 
 contract Test is ERC721A {
     //Owner will be set to the deployer of the address
@@ -18,7 +21,9 @@ contract Test is ERC721A {
 
     bool mintOne;
     bool mintTwo;
-    
+
+    bytes32 immutable public merkleRoot;
+
     uint256 private constant PRICE = 0.05 ether;
     uint256 private constant MAXMINTPERWALLET = 2;
     uint256 private constant _MAXMINTPERTRANSACTIONMINTONE = 4;
@@ -33,9 +38,10 @@ contract Test is ERC721A {
     uint256 private constant DURATIONONE = 90;
     uint256 private constant DURATIONTWO = 120;
     
-
-    constructor () ERC721A("Test", "TESTNFT") {
+   //input the hex hash of the whitelisted addresses
+    constructor (bytes32 _merkleRoot) ERC721A("Test", "TESTNFT") {
         owner = payable(msg.sender);
+        merkleRoot = _merkleRoot;
     }
 
     modifier onlyOwner() {
@@ -44,8 +50,12 @@ contract Test is ERC721A {
         }
         _;
     }
+
+    
     //This function will revert after 90seconds
-    function firstMint(uint256 quantity) external payable {
+    // The caller of the transaction will have to submit a proof (This will be sorted on the client side)
+    function firstMint (uint256 quantity, bytes32[] calldata proof) external payable {
+        require(isValid(proof, keccak256(abi.encodePacked(msg.sender))), "Not a part of whitelist!");
         if( mintOne != true) {
             revert Test_MintInactive();
         }
@@ -73,7 +83,9 @@ contract Test is ERC721A {
     //This function is locked till,you openMintTwo
     //Also it will revert in 120seconds you can increase the time to test well
     // Addresses that minted tokens in the first mint can't mint in the second mint
-    function secondMint (uint256 quantity) external payable {
+    function secondMint (uint256 quantity, bytes32[] calldata proof) external payable {
+        require(isValid(proof, keccak256(abi.encodePacked(msg.sender))), "Not a part of whitelist");
+        
         if( mintTwo != true) {
             revert Test_MintInactive();
          }
@@ -81,9 +93,11 @@ contract Test is ERC721A {
         if(block.timestamp > timestampTwo + DURATIONTWO) {
             revert Test_PresaleIsOver(); 
         }
+
         if (tokenCounterMintTwo == _MAXMINTPERTRANSACTIONMINTTWO) {
             revert Test_AllTokensHaveBeenMinted();
         }
+        // If openMintTwo hasn't been called  the owner
          
         //If ether sent is less than the price * quatity,the function reverts
         if(msg.value < quantity * PRICE ) {
@@ -109,6 +123,7 @@ contract Test is ERC721A {
         if(mintOne != true) {
             revert Test_MintTwoIsInactive();
         }
+
         timestampTwo = block.timestamp;
         mintTwo = true; 
     }
@@ -126,11 +141,12 @@ contract Test is ERC721A {
         require(success, "Fail");
     }
 
+    function isValid(bytes32[] calldata proof, bytes32 leaf) private view returns (bool) {
+        return MerkleProof.verify(proof, merkleRoot, leaf);
+    }
 }
 
 
-  
-    
 
 
 
